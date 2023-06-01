@@ -1,0 +1,49 @@
+name: PetClinic App CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          repository: 'spring-projects/spring-petclinic'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Test and build with Maven
+        run: ./mvnw --batch-mode --update-snapshots package
+
+      - name: aggregate artifacts
+        run: mkdir artifacts && cp target/spring-petclinic*.jar* artifacts/
+
+      - name: Publish to packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: spring-petclinic-artifacts
+          path: target/spring-petclinic*.jar*
+
+      - name: Install AWS CLI
+        uses: unfor19/install-aws-cli-action@master
+
+      - name: Publish to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN : ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_DEFAULT_REGION: "us-east-1"
+        run:  aws s3 cp target/*.jar s3://${{ vars.AWS_BUCKET }}/
